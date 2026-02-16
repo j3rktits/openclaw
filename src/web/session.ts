@@ -1,4 +1,5 @@
 import {
+  Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
@@ -117,7 +118,7 @@ export async function createWaSocket(
     version,
     logger,
     printQRInTerminal: false,
-    browser: ["openclaw", "cli", VERSION],
+    browser: Browsers.ubuntu("Chrome"),
     syncFullHistory: false,
     markOnlineOnConnect: false,
   });

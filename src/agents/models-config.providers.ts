@@ -69,8 +69,27 @@ const QWEN_PORTAL_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
-const OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
-const OLLAMA_API_BASE_URL = "http://127.0.0.1:11434";
+const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
+
+function resolveOllamaBaseUrl(): string {
+  const fromEnv = process.env.OLLAMA_BASE_URL;
+  return fromEnv && fromEnv.trim() ? fromEnv.trim() : DEFAULT_OLLAMA_BASE_URL;
+}
+
+function resolveOllamaApiBaseUrl(ollamaBaseUrl: string): string {
+  const fromEnv = process.env.OLLAMA_API_BASE_URL;
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.trim();
+  }
+  try {
+    return new URL(ollamaBaseUrl).origin;
+  } catch {
+    return "http://127.0.0.1:11434";
+  }
+}
+
+const OLLAMA_BASE_URL = resolveOllamaBaseUrl();
+const OLLAMA_API_BASE_URL = resolveOllamaApiBaseUrl(OLLAMA_BASE_URL);
 const OLLAMA_DEFAULT_CONTEXT_WINDOW = 128000;
 const OLLAMA_DEFAULT_MAX_TOKENS = 8192;
 const OLLAMA_DEFAULT_COST = {

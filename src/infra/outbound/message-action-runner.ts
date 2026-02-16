@@ -755,6 +755,16 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
       required: !mediaHint && !hasCard,
       allowEmpty: true,
     }) ?? "";
+
+  // Compatibility: some callers (including LLM tool calls) use `text` instead of `message`.
+  if (!message) {
+    const text = readStringParam(params, "text", { allowEmpty: true }) ?? "";
+    if (text) {
+      message = text;
+      params.message = message;
+    }
+  }
+
   if (message.includes("\\n")) {
     message = message.replaceAll("\\n", "\n");
   }

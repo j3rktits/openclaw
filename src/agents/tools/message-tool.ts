@@ -48,6 +48,11 @@ function buildRoutingSchema() {
 function buildSendSchema(options: { includeButtons: boolean; includeCards: boolean }) {
   const props: Record<string, unknown> = {
     message: Type.Optional(Type.String()),
+    text: Type.Optional(
+      Type.String({
+        description: "Alias for message (compat with older callers/LLM tool calls).",
+      }),
+    ),
     effectId: Type.Optional(
       Type.String({
         description: "Message effect name/id for sendWithEffect (e.g., invisible ink).",

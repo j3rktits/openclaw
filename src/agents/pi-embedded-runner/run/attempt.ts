@@ -86,6 +86,7 @@ import {
   createSystemPromptOverride,
 } from "../system-prompt.js";
 import { splitSdkTools } from "../tool-split.js";
+import { wrapStreamFnToolCallStubs } from "../tool-call-stubs.js";
 import { describeUnknownError, mapThinkingLevel } from "../utils.js";
 import { detectAndLoadPromptImages } from "./images.js";
 
@@ -537,6 +538,25 @@ export async function runEmbeddedAttempt(
         activeSession.agent.streamFn = anthropicPayloadLogger.wrapStreamFn(
           activeSession.agent.streamFn,
         );
+      }
+
+      // Ollama's OpenAI-compatible /v1/chat/completions does not return `tool_calls`.
+      // It places JSON tool-call stubs in assistant text content instead.
+      // Wrap the stream so we can coerce those stubs into real toolCall blocks.
+      if (activeSession.agent.streamFn) {
+        const allowedToolNames = new Set(
+          [...builtInTools, ...allCustomTools]
+            .map((tool) => (tool as { name?: unknown } | null)?.name)
+            .filter((name): name is string => typeof name === "string" && name.trim().length > 0),
+        );
+        const toolStubCompatEnabled =
+          params.provider === "ollama" && params.model.api === "openai-completions";
+        if (toolStubCompatEnabled) {
+          activeSession.agent.streamFn = wrapStreamFnToolCallStubs(activeSession.agent.streamFn, {
+            enabled: true,
+            allowedToolNames,
+          });
+        }
       }
 
       try {

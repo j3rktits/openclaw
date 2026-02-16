@@ -514,9 +514,19 @@ export const buildTelegramMessageContext = async ({
     : "";
   const groupLabel = isGroup ? buildGroupLabel(msg, chatId, resolvedThreadId) : undefined;
   const senderName = buildSenderName(msg);
-  const conversationLabel = isGroup
-    ? (groupLabel ?? `group:${chatId}`)
-    : buildSenderLabel(msg, senderId || chatId);
+
+  // Keep DM envelope headers safe/compact: prefer username + id over display names.
+  const directLabelParts: string[] = [];
+  if (senderUsername) {
+    directLabelParts.push(`@${senderUsername}`);
+  }
+  const directId = senderId || String(chatId);
+  if (directId) {
+    directLabelParts.push(`id:${directId}`);
+  }
+  const directLabel = directLabelParts.join(" ") || "id:unknown";
+
+  const conversationLabel = isGroup ? (groupLabel ?? `group:${chatId}`) : directLabel;
   const storePath = resolveStorePath(cfg.session?.store, {
     agentId: route.agentId,
   });

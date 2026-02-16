@@ -88,6 +88,25 @@ export const dispatchTelegramMessage = async ({
     removeAckAfterReply,
   } = context;
 
+  // Fast-path: keep Telegram connectivity tests snappy and avoid LLM/tool-call weirdness.
+  const rawTextLower = (msg.text ?? msg.caption ?? "").trim().toLowerCase();
+  if (!isGroup && rawTextLower === "ping") {
+    await deliverReplies({
+      replies: [{ text: "PONG" }],
+      chatId: String(chatId),
+      token: opts.token,
+      runtime,
+      bot,
+      replyToMode,
+      textLimit,
+      thread: threadSpec,
+      tableMode: resolveMarkdownTableMode({ cfg, channel: "telegram", accountId: route.accountId }),
+      chunkMode: resolveChunkMode(cfg, "telegram", route.accountId),
+      linkPreview: telegramCfg.linkPreview,
+    });
+    return;
+  }
+
   const isPrivateChat = msg.chat.type === "private";
   const draftThreadId = threadSpec.id;
   const draftMaxChars = Math.min(textLimit, 4096);
