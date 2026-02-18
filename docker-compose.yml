@@ -36,8 +36,6 @@ services:
       - /var/run/tailscale:/var/run/tailscale:ro
     init: true
     restart: unless-stopped
-    depends_on:
-      - ollama
     command:
       [
         "node",
@@ -67,6 +65,4 @@ services:
     stdin_open: true
     tty: true
     init: true
-    depends_on:
-      - ollama
     entrypoint: ["node", "dist/index.js"]

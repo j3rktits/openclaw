@@ -259,7 +259,7 @@ export const dispatchTelegramMessage = async ({
       "ping",
       "tail logs",
       "",
-      "For anything else: describe what you want. The bot will queue a job and reply later with the command output.",
+      "For anything else: describe what you want. Optional: prefix with 'on llm-test:' or 'on dead:'. The bot will queue a job and reply later with the command output.",
     ].join("\n");
     await deliverReplies({
       replies: [{ text }],

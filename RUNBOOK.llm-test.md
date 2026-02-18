@@ -68,6 +68,21 @@ Agent:
 
 If the output is large, tail it and say "(truncated)".
 
+
+### Local environment context (teach the planner)
+
+To teach the OpenAI planner about your real environment (projects, paths, service names, SSH aliases) without hardcoding:
+
+- Create `/home/derp/.openclaw/env-context.md` on `llm-test` (keep it short; no secrets).
+- It is mounted into the gateway container at `/home/node/.openclaw/env-context.md`.
+- The Telegram DM planner automatically includes up to ~12KB of this file in its planning prompt.
+
+### GPU vs CPU for Ollama
+
+- Default: Ollama runs on CPU.
+- Optional GPU: use `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d ollama`.
+  - If the NVIDIA driver is not loaded, GPU mode will fail to start.
+
 ## 1. Current Architecture
 
 ### Server: llm-test

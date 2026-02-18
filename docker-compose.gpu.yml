@@ -1,0 +1,5 @@
+# Optional GPU enablement for Ollama.
+# Use explicitly: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d ollama
+services:
+  ollama:
+    gpus: all
