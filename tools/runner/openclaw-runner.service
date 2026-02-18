@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenClaw JSONL Ops Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=derp
+Group=derp
+EnvironmentFile=/etc/openclaw/openclaw-runner.env
+ExecStart=/usr/bin/python3 /home/derp/openclaw/tools/runner/runner.py
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+

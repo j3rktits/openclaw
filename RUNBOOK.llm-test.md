@@ -14,7 +14,7 @@ Goal: when a user sends a Telegram message, OpenClaw should route it to an agent
 #### What success looks like (acceptance criteria)
 1. For Telegram DMs, the bot ALWAYS replies with a useful result (never "no reply").
 2. Replies MUST be plain text (no `<tools>` blocks, no JSON tool envelopes, no internal traces).
-3. Commands must be executed deterministically using the `exec` tool, with:
+3. Commands must be executed deterministically using a queued job runner (not tool calls in Telegram), with:
    - timeouts
    - bounded output (tail / max lines)
    - clear errors when a command fails
@@ -33,18 +33,22 @@ Goal: when a user sends a Telegram message, OpenClaw should route it to an agent
 
 #### Implementation guidance (preferred)
 - Keep a small set of truly safe, deterministic shortcuts (e.g., `ping`, `tail logs`) ONLY if they eliminate known failure modes.
-- For everything else, implement a robust "ops intent → exec plan" flow:
-  - parse intent (logs/status/restart/git/etc.)
-  - pick commands from a small internal mapping (in code), NOT from user-editable text files
-  - run via exec with limits
-  - return the output
+- For everything else, use a robust "ops intent → plan → queue → deterministic execution" flow:
+  - plan commands (bounded, safe) with best-quality planning
+  - append the plan to an append-only JSONL queue
+  - run the plan in a deterministic runner with limits
+  - post results back to Telegram as plain text
 
 #### Environment facts you must respect
 - Host: `llm-test`
 - Docker Compose is used to run OpenClaw.
 - OpenClaw internal log is at `/tmp/openclaw/openclaw-*.log` inside the gateway container (or equivalent).
 - Ollama baseUrl is `http://127.0.0.1:11434/v1` (host networking).
-- We previously saw failures caused by tool envelope leakage and session tool misuse; the fix direction is: plain-text replies + exec-only ops actions.
+- Job queue paths (host + container-mounted):
+  - Jobs: `/var/lib/openclaw/jobs.jsonl`
+  - Results: `/var/lib/openclaw/results.jsonl`
+  - Cursor: `/var/lib/openclaw/jobs.cursor`
+- We previously saw failures caused by tool envelope leakage and session tool misuse; the fix direction is: plain-text replies + queued execution.
 
 #### Non-goals / anti-patterns (DO NOT DO THESE)
 - Do not add more "commands list in a text file" for Telegram to interpret.
@@ -68,12 +72,15 @@ If the output is large, tail it and say "(truncated)".
 
 ### Server: llm-test
 - Ubuntu 22.04
-- Docker + OpenClaw gateway
-- Ollama running locally
+- Docker + OpenClaw gateway (Telegram ingress)
+- OpenAI API (planner only, best-quality)
+- Python runner daemon (deterministic execution + Telegram postback)
+- Ollama running locally (optional / unrelated to queued ops flow)
 - Gateway uses network_mode: host
 - Ollama base URL: http://127.0.0.1:11434/v1
-- Sandbox mode: off
-- Telegram bound to agent: main
+- Telegram DMs:
+  - `ping`, `tail logs` are deterministic fast-paths
+  - everything else is planned then queued to `/var/lib/openclaw/jobs.jsonl`
 
 ### Laptop: dead
 - VS Code
@@ -91,12 +98,11 @@ SSH to dead only occurs if explicitly invoked by OpenClaw.
 ## 2. Model & Provider Reality
 
 Operationally:
-- All current inference is Ollama-only (local models).
-- No OpenAI API calls occur in the main agent flow.
+- Telegram planning uses OpenAI API via `OPENAI_API_KEY`.
+- Deterministic execution is done by a Python runner (no tool calls in Telegram).
 
 However:
-- openclaw.json still contains openai / openai-codex auth profiles.
-- These profiles exist but are not used by current agent model settings.
+- Ollama may still be used elsewhere in OpenClaw, but queued ops reliability does not depend on it.
 
 ---
 

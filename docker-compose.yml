@@ -12,6 +12,9 @@ services:
   openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     network_mode: host
+    env_file:
+      # Do not commit secrets. Create this on the host with chmod 600.
+      - ${OPENCLAW_CONFIG_DIR}/secrets.env
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -25,6 +28,8 @@ services:
       - ${OPENCLAW_CONFIG_DIR}/ssh:/home/node/.ssh
       # Persist gateway log files across container restarts.
       - ${OPENCLAW_CONFIG_DIR}/tmp-openclaw:/tmp/openclaw
+      # JSONL job queue shared with the host runner.
+      - /var/lib/openclaw:/var/lib/openclaw
       # Needed for tailscale identity auth (tailscale whois).
       - /usr/bin/tailscale:/usr/bin/tailscale:ro
       - /var/run/tailscale:/var/run/tailscale:ro
