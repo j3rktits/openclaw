@@ -277,10 +277,14 @@ def main() -> None:
     poll = read_env_float("POLL_INTERVAL_SEC", 0.5)
 
     os.makedirs(os.path.dirname(jobs_path), exist_ok=True)
+    # Avoid noisy "missing file" loops on first boot.
+    open(jobs_path, "ab").close()
 
     offset = read_cursor(cursor_path)
     while True:
         try:
+            # Ensure the jobs file exists even if it was deleted/rotated.
+            open(jobs_path, "ab").close()
             with open(jobs_path, "rb") as f:
                 f.seek(offset)
                 while True:
@@ -347,6 +351,9 @@ def main() -> None:
                     write_jsonl(results_path, result)
                     telegram_send(token, job.chat_id, format_result_message(job, exit_code, out, err_s, trunc))
                     write_cursor(cursor_path, offset)
+        except FileNotFoundError:
+            # The queue directory might not exist yet; retry after a short sleep.
+            pass
         except Exception as e:
             # Keep running; systemd will also restart if we crash.
             print(f"runner loop error: {e}", flush=True)
@@ -356,4 +363,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
