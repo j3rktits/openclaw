@@ -160,12 +160,17 @@ def run_one_command_dead(cmd: str, cwd: Optional[str], timeout_sec: int, ssh_ali
     remote = cmd
     if cwd:
         remote = f"cd {shlex.quote(cwd)} && {cmd}"
+    known_hosts = os.environ.get("SSH_KNOWN_HOSTS", "/var/lib/openclaw/known_hosts").strip() or "/var/lib/openclaw/known_hosts"
     ssh_cmd = [
         "ssh",
         "-o",
         "BatchMode=yes",
         "-o",
         "ConnectTimeout=5",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        f"UserKnownHostsFile={known_hosts}",
         ssh_alias,
         "--",
         "bash",
