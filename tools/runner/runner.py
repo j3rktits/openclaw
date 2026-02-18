@@ -170,6 +170,8 @@ def run_one_command_dead(cmd: str, cwd: Optional[str], timeout_sec: int, ssh_ali
         "-o",
         "ConnectTimeout=5",
         "-o",
+        "LogLevel=ERROR",
+        "-o",
         "StrictHostKeyChecking=accept-new",
         "-o",
         f"UserKnownHostsFile={known_hosts}",

@@ -42,7 +42,7 @@ const TELEGRAM_ALLOWLIST_CHAT_ID = Number(
 );
 
 function makeEnvContext(): string {
-  return [
+  const base = [
     "Host roles:",
     "- llm-test: Ubuntu 22.04, runs OpenClaw via docker compose in /home/derp/openclaw",
     "- dead: reachable from llm-test via SSH alias 'dead' over Tailscale",
@@ -54,6 +54,19 @@ function makeEnvContext(): string {
     "- Do not install packages unless explicitly asked",
     "- Do not suggest editing IDENTITY.md/TOOLS.md as a solution",
   ].join("\n");
+
+  // Optional user-maintained context file (not committed): lets you teach the planner about your real env.
+  // Keep it short; we hard-cap how much we include.
+  const ctxPath = (process.env.OPENCLAW_ENV_CONTEXT_PATH ?? "/home/node/.openclaw/env-context.md").trim();
+  if (!ctxPath) return base;
+  try {
+    const raw = fs.readFileSync(ctxPath, "utf8");
+    const snippet = raw.slice(0, 12 * 1024).trim();
+    if (!snippet) return base;
+    return `${base}\n\nAdditional local context (${ctxPath}):\n${snippet}`;
+  } catch {
+    return base;
+  }
 }
 
 function newJobId(): string {
