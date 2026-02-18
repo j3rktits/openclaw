@@ -11,8 +11,80 @@ type JsonToolCallStub = {
 
 function stripJsonCodeFence(text: string): string {
   const trimmed = text.trim();
-  const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return match ? match[1].trim() : trimmed;
+  // Prefer extracting JSON from a fenced block if present. Some models emit:
+  // ```json
+  // {...}
+  // ```
+  // plus extra text. We take the first fenced payload.
+  const fullFence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fullFence) {
+    return fullFence[1].trim();
+  }
+  const firstFence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (firstFence) {
+    return firstFence[1].trim();
+  }
+  return trimmed;
+}
+
+function extractFirstJsonValue(text: string): string | null {
+  const s = text;
+  let start = -1;
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s[i];
+    if (c === "{" || c === "[") {
+      start = i;
+      break;
+    }
+  }
+  if (start < 0) {
+    return null;
+  }
+
+  // Extract the first balanced JSON value (object/array), skipping braces inside strings.
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < s.length; i += 1) {
+    const c = s[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (c === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (c === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (c === "\"") {
+      inString = true;
+      continue;
+    }
+    if (c === "{" || c === "[") {
+      stack.push(c);
+      continue;
+    }
+    if (c === "}" || c === "]") {
+      const last = stack[stack.length - 1];
+      const ok = (last === "{" && c === "}") || (last === "[" && c === "]");
+      if (!ok) {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
+        return s.slice(start, i + 1).trim();
+      }
+    }
+  }
+
+  return null;
 }
 
 function parseToolCallArgs(raw: unknown): Record<string, unknown> | null {
@@ -41,23 +113,23 @@ function parseToolCallArgs(raw: unknown): Record<string, unknown> | null {
 
 function parseToolCallStubsFromText(text: string): Array<{ name: string; args: Record<string, any> }> | null {
   const cleaned = stripJsonCodeFence(text);
-  if (!cleaned) {
+  const candidate = extractFirstJsonValue(cleaned) ?? cleaned.trim();
+  if (!candidate) {
     return null;
   }
-  const upper = cleaned.trim().toUpperCase();
+  const upper = candidate.trim().toUpperCase();
   if (upper === "NOOP" || upper === "NOOP {}") {
     return null;
   }
 
-  // Only treat content that is *entirely* JSON as a tool call stub.
-  const head = cleaned.trimStart();
+  const head = candidate.trimStart();
   if (!(head.startsWith("{") || head.startsWith("["))) {
     return null;
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(candidate);
   } catch {
     return null;
   }
@@ -89,23 +161,31 @@ function coerceAssistantTextToToolCalls(msg: AssistantMessage, allowedToolNames?
   if (!msg || msg.role !== "assistant") {
     return msg;
   }
-  if (!Array.isArray(msg.content) || msg.content.length !== 1) {
+  if (!Array.isArray(msg.content) || msg.content.length < 1) {
+    return msg;
+  }
+  const texts: string[] = [];
+  for (const block of msg.content as unknown[]) {
+    if (!block || typeof block !== "object") {
+      return msg;
+    }
+    const type = (block as { type?: unknown }).type;
+    if (type !== "text") {
+      return msg;
+    }
+    const text = (block as { text?: unknown }).text;
+    if (typeof text !== "string") {
+      return msg;
+    }
+    if (text.trim()) {
+      texts.push(text);
+    }
+  }
+  if (texts.length === 0) {
     return msg;
   }
 
-  const block = msg.content[0] as unknown;
-  if (!block || typeof block !== "object") {
-    return msg;
-  }
-  const text =
-    (block as { type?: unknown; text?: unknown }).type === "text"
-      ? (block as { text?: unknown }).text
-      : undefined;
-  if (typeof text !== "string") {
-    return msg;
-  }
-
-  const stubs = parseToolCallStubsFromText(text);
+  const stubs = parseToolCallStubsFromText(texts.join("\n"));
   if (!stubs) {
     return msg;
   }
