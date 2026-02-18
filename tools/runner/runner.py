@@ -160,7 +160,9 @@ def run_one_command_dead(cmd: str, cwd: Optional[str], timeout_sec: int, ssh_ali
     remote = cmd
     if cwd:
         remote = f"cd {shlex.quote(cwd)} && {cmd}"
-    known_hosts = os.environ.get("SSH_KNOWN_HOSTS", "/var/lib/openclaw/known_hosts").strip() or "/var/lib/openclaw/known_hosts"
+    ssh_user = os.environ.get("SSH_USER", "derp").strip() or "derp"
+    identity = os.environ.get("SSH_IDENTITY_FILE", "/home/derp/.openclaw/ssh/id_ed25519").strip()
+    known_hosts = os.environ.get("SSH_KNOWN_HOSTS", "/home/derp/.openclaw/ssh/known_hosts").strip() or "/home/derp/.openclaw/ssh/known_hosts"
     ssh_cmd = [
         "ssh",
         "-o",
@@ -171,12 +173,18 @@ def run_one_command_dead(cmd: str, cwd: Optional[str], timeout_sec: int, ssh_ali
         "StrictHostKeyChecking=accept-new",
         "-o",
         f"UserKnownHostsFile={known_hosts}",
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        f"User={ssh_user}",
         ssh_alias,
         "--",
         "bash",
         "-lc",
         remote,
     ]
+    if identity:
+        ssh_cmd[1:1] = ["-i", identity]
     p = subprocess.run(
         ssh_cmd,
         text=True,
